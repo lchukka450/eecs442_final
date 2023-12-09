@@ -7,13 +7,17 @@ import json
 
 instance_id_map = {}
 
-def create_instance_id_mapping():
-    with open("ego_objects_challenge_train.json", 'r') as json_file:
+def create_instance_id_mapping(fname):
+    instance_id_map = {} # from ego objects challenge test & train
+    
+    with open(fname, 'r') as json_file:
         data = json.load(json_file)
         for item in data["annotations"]:
             instance_id = item.get('instance_id')
             if instance_id not in instance_id_map:
                 instance_id_map[instance_id] = {'id': item.get('id'), 'category_id': item.get('category_id')}
+    
+    return instance_id_map
 
 def get_info_ego(id): 
     return (instance_id_map[id])
@@ -47,7 +51,7 @@ def open_image(id):
         path = f"images/{id}.jpg"
         print(path)
         img = Image.open(path)
-        img.show()  # This will open the image using the default image viewer application
+        img.show()  
     except FileNotFoundError:
         print("File not found. Please provide a valid filename.")
     except Exception as e:
@@ -73,10 +77,11 @@ def get_dataloader():
     return data_loader
 
 
-class AttributeSet(Dataset):
-    def __init__(self, images, attributes):
-        self.images = images
-        self.attributes = attributes
+class PhysObsDataset(Dataset):
+    def __init__(self, id_json_file):
+        instance_ids = json.load(id_json_file)
+        self.instance_to_id = 
+
         
     def __len__(self):
         return len(self.images)
@@ -90,7 +95,9 @@ class AttributeSet(Dataset):
 
 # # load_images_from_directory("images/")
 # print(get_training_ids(""))
-
-create_instance_id_mapping()
-print(get_info_ego("FD9994FA1EF18DCB71461E469635EE95_402_0"))
-open_image("FD9994FA1EF18DCB71461E469635EE95_402_0")
+if __name__ == '__main__':
+    # 0A0DD98EB432BFD4563DAB1750D552FF_01_38    first image id 
+    create_instance_id_mapping()
+     #FD9994FA1EF18DCB71461E469635EE95_09_37
+    print(get_info_ego("FD9994FA1EF18DCB71461E469635EE95_09_37"))
+    # open_image("FD9994FA1EF18DCB71461E469635EE95_402_0")
