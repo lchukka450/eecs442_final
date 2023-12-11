@@ -8,7 +8,8 @@ from PIL import Image
 import pandas as pd
 from typing import NamedTuple
 import numpy as np 
- 
+import json
+import random
 
 DEFAULT_TRANSFORM = transforms.Compose([
     transforms.Resize((540, 1200)),  # Resize the image
@@ -228,7 +229,52 @@ class PhysObsDataset(Dataset):
         
         
 dataset = PhysObsDataset("", "", "")
-print(dataset.get_data()[243510])
-print(dataset.get_stats())
 
-print(dataset.get_mass_matrix())
+# Load JSON 
+with open('ego_objects_challenge_train.json', 'r') as file:
+    json_data = json.load(file)
+train_image_ids = [2432626686873416, 487812089498173]
+#train_image_ids = [image["id"] for image in json_data["images"][:20]]
+#train_image_ids = random.sample([image["id"] for image in json_data["images"]], 20)
+'''
+with open('physobjects/instance_ids/train_ids.json', 'r') as file:
+    json_ids = json.load(file)
+train_image_ids = random.sample(json_ids, 20)
+id_lookup = {entry["instance_id"]: entry["image_id"] for entry in json_data["annotations"]}
+'''
+'''
+for inst_id in train_image_ids:
+    id_value = id_lookup.get(inst_id)
+    if id_value is not None:
+        print(f"For Instance ID {inst_id}, the associated ID is: {id_value}")
+    else:
+        print(f"No matching ID found for Instance ID {inst_id}")
+'''
+       
+for train_image_id in train_image_ids:
+    image_entry = next((image for image in json_data["images"] if image["id"] == train_image_id), None)
+    #id_value = id_lookup.get(train_image_id)
+    #image_entry = next((image for image in json_data["images"] if image["id"] == id_value), None)
+    if image_entry:
+        main_category = image_entry["main_category"]
+        print(f"The main_category for image {train_image_id} is: {main_category}")
+        
+        main_category_instance_ids = image_entry["main_category_instance_ids"]
+        print(f"The main_category_instance_ids for image {train_image_id} is: {main_category_instance_ids[-1]}")
+        
+        group_id = image_entry["group_id"]
+        print(f"The group_id for image {train_image_id} is: {group_id}")
+          
+        data = dataset.get_data()
+        item = main_category_instance_ids[-1]
+        if item in data:
+            print(data[item])
+        else:
+            print("Item not found in categories")
+    else:
+        print(f"Image with ID {train_image_id} not found.")
+     
+#print(dataset.get_data()[243510])
+#print(dataset.get_stats())
+
+#print(dataset.get_mass_matrix())
