@@ -4,71 +4,43 @@ import torch.optim as optim
 import dataset 
 import os 
 from PIL import Image
+import json
 
-class Encoder(nn.Module):
-    def __init__(self):
-        super(Encoder, self).__init__()
-        # encoder layers
-        self.encoder = nn.Sequential(
-            nn.Conv2d(in_channels=3, out_channels=12, kernel_size=4, stride=2, padding=1),
-            nn.ReLU(),
-            nn.Conv2d(in_channels=12, out_channels=24, kernel_size=4, stride=2, padding=1),
-            nn.ReLU(),
-            nn.Conv2d(in_channels=24, out_channels=48, kernel_size=4, stride=2, padding=1),
-            nn.ReLU(),
-            nn.Conv2d(in_channels=48, out_channels=24, kernel_size=4, stride=2, padding=1),
-            nn.ReLU()
-        ) 
+from model import AffordEnc
+from dataset import PhysObsDataset
+
+
+def train(model: AffordEnc,
+          train_loader: torch.utils.data.DataLoader,
+          val_loader: torch.utils.data.DataLoader,
+          num_epochs: int = 10,
+          device: str = "cuda",
+          save_dir: str = "exps",
+          lr: float = 1e-3,
+          weight_decay: float = 1e-5,
+          log_every: int = 100,
+          save_every: int = 1):
     
-    def forward(self, x):
-        encoded_representation = self.encoder(x)
-        return encoded_representation
+    # create exps if it doesn't exist
+    if not os.path.exists(save_dir):
+        os.mkdir(save_dir)
+    # create checkpoints and logs if they don't exist
+    if not os.path.exists(os.path.join(save_dir, "checkpoints")):
+        os.mkdir(os.path.join(save_dir, "checkpoints"))
+    if not os.path.exists(os.path.join(save_dir, "logs")):
+        os.mkdir(os.path.join(save_dir, "logs"))
 
-class Decoder(nn.Module):
-    def __init__(self):
-        super(Decoder, self).__init__()
-        # decoder layers 
-        self.decoder = nn.Sequential(
-            nn.ConvTranspose2d(in_channels=24, out_channels=48, kernel_size=4, stride=2, padding=1),
-            nn.ReLU(),
-            nn.ConvTranspose2d(in_channels=48, out_channels=24, kernel_size=4, stride=2, padding=1),
-            nn.ReLU(),
-            nn.ConvTranspose2d(in_channels=24, out_channels=12, kernel_size=4, stride=2, padding=1),
-            nn.ReLU(),
-            nn.ConvTranspose2d(in_channels=12, out_channels=3, kernel_size=4, stride=2, padding=1),
-            nn.Sigmoid()
-        )
-    def forward(self, x):
-        # Define forward pass for the decoder
-        reconstructed_image = self.decoder(x)
-        return reconstructed_image
+    # write hyperparams to a json file
+    hyperparams = {
+        "num_epochs": num_epochs,
+        "device": device,
+        "save_dir": save_dir,
+        "lr": lr,
+        "weight_decay": weight_decay,
+        "log_every": log_every,
+        "save_every": save_every
+    }
+    with open(os.path.join(save_dir, "hyperparams.json"), "w") as f:
+        json.dump(hyperparams, f)
 
-encoder = Encoder()
-decoder = Decoder()
-
-criterion = nn.MSELoss()
-
-# hyperparams 
-learning_rate = 0.001
-optimizer = optim.Adam(list(encoder.parameters()) + list(decoder.parameters()), lr=learning_rate)
-dataloader = dataset.get_dataloader()
-
-num_epochs = 10
-for epoch in range(num_epochs):
-    
-    for images, attributes in dataloader:  
-        optimizer.zero_grad()
-        
-        encoded = encoder(images)
-        
-        reconstructed = decoder(encoded)
-        loss = criterion(reconstructed, images)  
-        
-        # backwards pass and optimization
-        loss.backward()
-        optimizer.step()
-    
-    print(f"Epoch [{epoch + 1}/{num_epochs}], Loss: {loss.item():.4f}")
-
-img_test = Image.open(os.path.join(os.getcwd(), "test_image.jpg"))
-latent_representation = encoder(img_test)
+    # define loss function and optimizer
