@@ -6,41 +6,34 @@ import os
 from PIL import Image
 import json
 
-from model import AffordEnc
+from model import AcroModel
 from dataset import PhysObsDataset
 
 
-def train(model: AffordEnc,
-          train_loader: torch.utils.data.DataLoader,
-          val_loader: torch.utils.data.DataLoader,
-          num_epochs: int = 10,
-          device: str = "cuda",
-          save_dir: str = "exps",
-          lr: float = 1e-3,
-          weight_decay: float = 1e-5,
-          log_every: int = 100,
-          save_every: int = 1):
-    
-    # create exps if it doesn't exist
-    if not os.path.exists(save_dir):
-        os.mkdir(save_dir)
-    # create checkpoints and logs if they don't exist
-    if not os.path.exists(os.path.join(save_dir, "checkpoints")):
-        os.mkdir(os.path.join(save_dir, "checkpoints"))
-    if not os.path.exists(os.path.join(save_dir, "logs")):
-        os.mkdir(os.path.join(save_dir, "logs"))
+def train_model(
+        model,
+        train_loader,
+        val_loader,
+        epochs,
+        device
+):
+    bce_criterion = nn.BCELoss()
+    ce_criterion = nn.CrossEntropyLoss()
+    optimizer = optim.Adam(model.parameters(), lr=1e-4)
 
-    # write hyperparams to a json file
-    hyperparams = {
-        "num_epochs": num_epochs,
-        "device": device,
-        "save_dir": save_dir,
-        "lr": lr,
-        "weight_decay": weight_decay,
-        "log_every": log_every,
-        "save_every": save_every
-    }
-    with open(os.path.join(save_dir, "hyperparams.json"), "w") as f:
-        json.dump(hyperparams, f)
+    for epoch in range(epochs):
+        running_loss = 0.0
+        model.train()
+        for i, data in enumerate(train_loader):
+            img1, img2, label = data
+            img1, img2, label = img1.to(device), img2.to(device), label.to(device)
+            optimizer.zero_grad()
+            output = model(img1, img2)
+            loss = bce_criterion(output, label)
+            loss.backward()
+            optimizer.step()
 
-    # define loss function and optimizer
+            running_loss += loss.item()
+            if i % 100 == 99:
+                print(f'Epoch: {epoch + 1}, Batch: {i + 1}, Loss: {running_loss / 100}')
+                running_loss = 0.0

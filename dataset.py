@@ -12,7 +12,7 @@ import json
 import random
 
 DEFAULT_TRANSFORM = transforms.Compose([
-    transforms.Resize((540, 1200)),  # Resize the image
+    transforms.Resize((560, 560)),  # Resize the image
     transforms.ToTensor(),          # Convert PIL image to tensor
     # Add more transforpmations if required
 ])
@@ -38,11 +38,12 @@ class AcroObj:
     
 
 class PhysObsDataset(Dataset):
-    def __init__(self, img_dir, phys_obs_json, path_phys_obs, transform=None):
+    def __init__(self, img_dir, transform=None):
+
         self.img_dir = img_dir
         self.filenames = glob.glob(f"{self.img_dir}/*.jpg")
         self.transform = transform if transform else DEFAULT_TRANSFORM
-        self.path_physobjs = path_phys_obs
+
         self.acro_obj_list = {}
         self.deformability_matrix = None
         self.mass_matrix = None
@@ -51,10 +52,13 @@ class PhysObsDataset(Dataset):
     def __len__(self):
         return len(self.filenames)
 
-    def __getitem__(self, index):
+    def __getitem__(self, index, as_tensor=False):
+
         fname = self.filenames[index]
         img = Image.open(fname)
         img = self.transform(img)
+
+        return img
     
     def get_deformability_matrix(self):
         data = pd.read_csv("physobjects/annotations/crowdsourced/deformability/train.csv")
@@ -228,8 +232,8 @@ class PhysObsDataset(Dataset):
         return matrix
         
         
-dataset = PhysObsDataset("", "", "")
-
+# dataset = PhysObsDataset("", "", "")
+# 
 # Load JSON 
 with open('ego_objects_challenge_train.json', 'r') as file:
     json_data = json.load(file)
@@ -275,6 +279,6 @@ for train_image_id in train_image_ids:
         print(f"Image with ID {train_image_id} not found.")
      
 #print(dataset.get_data()[243510])
-#print(dataset.get_stats())
+## print(dataset.get_stats())
 
 #print(dataset.get_mass_matrix())

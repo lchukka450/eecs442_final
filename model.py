@@ -38,8 +38,8 @@ class BinaryClassifier(nn.Module):
             nn.Linear(hidden_size, num_classes)
         )
     
-    def forward(self, x1, x2):
-        x = torch.cat((x1, x2), dim=1)
+    def forward(self, x: torch.tensor) -> torch.tensor:
+        x = torch.flatten(x, start_dim=1)
         output = self.binary_classifier(x)
 
         if self.num_classes == 1:
@@ -55,7 +55,7 @@ class AffordanceEncoder(nn.Module):
                  hidden_sizes=(1024, 1024),
                  embed_size=512):
 
-        super(AffordEnc, self).__init__()
+        super(AffordanceEncoder, self).__init__()
 
         self.hidden_sizes = hidden_sizes
         self.embed_size = embed_size
@@ -74,8 +74,8 @@ class AffordanceEncoder(nn.Module):
 #Affordance-Aware CLIP-based Representation of Objects
 class AcroModel(nn.Module):
     def __init__(self,
-                 clip_model,
-                 clip_processor,
+                 pretrained_encoder,
+                 pretrained_emb_size=1000,
                  affordance_hidden_sizes=(1024, 1024),
                  affordance_emb_size=512,
                  clf_hidden_size=256,
@@ -83,12 +83,13 @@ class AcroModel(nn.Module):
     ):
 
         super(AcroModel, self).__init__()
-
-        self.clip_model = clip_model
-        self.clip_processor = clip_processor
+        
+        self.pretrained_encoder = pretrained_encoder
+        self.pretrained_emb_size = pretrained_emb_size
 
         self.affordance_hidden_sizes = affordance_hidden_sizes
         self.affordance_embed_size = affordance_emb_size
+        self.affordance_encoder = AffordanceEncoder(pretrained_emb_size, affordance_hidden_sizes, affordance_emb_size)
 
         self.clf_hidden_size = clf_hidden_size
         self.num_materials = num_materials
@@ -103,26 +104,28 @@ class AcroModel(nn.Module):
         self.mass_clf = BinaryClassifier(affordance_emb_size, clf_hidden_size, 2)
     
     def forward(self, images):
-        inputs = self.clip_processor(images=images, return_tensors="pt", padding=True)
-        with torch.no_grad():
-            image_features = self.clip_model.encode_image(inputs)
+        """
+        images: (batch_size, 2, 3, 224, 224)
+        """
+        image_features = self.pretrained_encoder(images.squeeze(0)) # collapse pairs
         
         affordance_features = self.affordance_encoder(image_features)
+        affordance_features = affordance_features.unsqueeze(0)
 
-        liquid_pred = self.liquid_clf(affordance_features)
-        sealed_pred = self.sealed_clf(affordance_features)
-        material_pred = self.material_clf(affordance_features)
-        transparent_pred = self.transparent_clf(affordance_features)
+        # liquid_pred = self.liquid_clf(affordance_features)
+        # sealed_pred = self.sealed_clf(affordance_features)
+        # material_pred = self.material_clf(affordance_features)
+        # transparent_pred = self.transparent_clf(affordance_features)
 
         deform_pred = self.deform_clf(affordance_features)
         fragility_pred = self.fragility_clf(affordance_features)
         mass_pred = self.mass_clf(affordance_features)
 
         return {
-            "liquid": liquid_pred,
-            "sealed": sealed_pred,
-            "material": material_pred,
-            "transparent": transparent_pred,
+            # "liquid": liquid_pred,
+            # "sealed": sealed_pred,
+            # "material": material_pred,
+            # "transparent": transparent_pred,
             "deform": deform_pred,
             "fragility": fragility_pred,
             "mass": mass_pred
