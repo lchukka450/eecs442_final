@@ -1,3 +1,6 @@
 images/
 physobjects/
 *.pyc
+features/
+ORBIT-Dataset/
+*.pth

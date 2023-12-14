@@ -71,15 +71,16 @@ class AffordanceEncoder(nn.Module):
     def forward(self, x):
         output = self.enc(x)
         return output
-#Affordance-Aware CLIP-based Representation of Objects
+#Affordance-Aware Contrastive Representation of Objects
 class AcroModel(nn.Module):
     def __init__(self,
                  pretrained_encoder,
-                 pretrained_emb_size=1000,
-                 affordance_hidden_sizes=(1024, 1024),
+                 pretrained_emb_size=384,
+                 affordance_hidden_sizes=(512, 1024),
                  affordance_emb_size=512,
                  clf_hidden_size=256,
                  num_materials=22,
+                 device='cuda',
     ):
 
         super(AcroModel, self).__init__()
@@ -107,26 +108,62 @@ class AcroModel(nn.Module):
         """
         images: (batch_size, 2, 3, 224, 224)
         """
-        image_features = self.pretrained_encoder(images.squeeze(0)) # collapse pairs
+        images.requires_grad = True
+        images = torch.flatten(images, start_dim=0, end_dim=1) # (batch_size * 2, 3, 224, 224)
+        with torch.no_grad():
+            image_features = self.pretrained_encoder(images)
         
-        affordance_features = self.affordance_encoder(image_features)
-        affordance_features = affordance_features.unsqueeze(0)
+        affordance_features = self.affordance_encoder(image_features) # (batch_size * 2, 512)
 
-        # liquid_pred = self.liquid_clf(affordance_features)
-        # sealed_pred = self.sealed_clf(affordance_features)
-        # material_pred = self.material_clf(affordance_features)
-        # transparent_pred = self.transparent_clf(affordance_features)
+        liquid_pred = self.liquid_clf(affordance_features)
+        sealed_pred = self.sealed_clf(affordance_features)
+        material_pred = self.material_clf(affordance_features)
+        transparent_pred = self.transparent_clf(affordance_features)
+
+        affordance_features = affordance_features.view(-1, 2, self.affordance_embed_size)
 
         deform_pred = self.deform_clf(affordance_features)
         fragility_pred = self.fragility_clf(affordance_features)
         mass_pred = self.mass_clf(affordance_features)
 
-        return {
-            # "liquid": liquid_pred,
-            # "sealed": sealed_pred,
-            # "material": material_pred,
-            # "transparent": transparent_pred,
-            "deform": deform_pred,
-            "fragility": fragility_pred,
-            "mass": mass_pred
-        }
+        return (
+            (liquid_pred,
+            sealed_pred,
+            material_pred,
+            transparent_pred),
+            (deform_pred,
+            fragility_pred,
+            mass_pred)
+        )
+
+        # return {
+        #     "liquid": liquid_pred,
+        #     "sealed": sealed_pred,
+        #     "material": material_pred,
+        #     "transparent": transparent_pred,
+        #     "deform": deform_pred,
+        #     "fragility": fragility_pred,
+        #     "mass": mass_pred
+        # }
+    
+    def to_device(self, device):
+        self.device = device
+        self.to(device)
+
+        self.pretrained_encoder = self.pretrained_encoder.to(device)
+        
+        self.liquid_clf = self.liquid_clf.to(device)
+        self.sealed_clf = self.sealed_clf.to(device)
+        self.material_clf = self.material_clf.to(device)
+        self.transparent_clf = self.transparent_clf.to(device)
+
+        self.deform_clf = self.deform_clf.to(device)
+        self.fragility_clf = self.fragility_clf.to(device)
+        self.mass_clf = self.mass_clf.to(device)
+    
+    def encode(self, img):
+
+        with torch.no_grad():
+            img_features = self.pretrained_encoder(img)
+        affordance_features = self.affordance_encoder(img_features)
+        return affordance_features
